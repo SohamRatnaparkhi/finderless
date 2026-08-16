@@ -91,3 +91,7 @@ The layer costs about 10ms of shell startup. `fzf --zsh` and `zoxide init zsh` e
 ```
 
 Removes the symlinks and the `.zshrc` hook. Homebrew formulae and backup files are left alone on purpose.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
