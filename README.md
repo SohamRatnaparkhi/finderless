@@ -17,6 +17,7 @@ $ o books raft
 
 $ oe open.zsh          # same idea, opens in your editor
 $ s "raft election"    # live grep through file contents, lands on the matching line
+$ w raft consensus     # web search in your default browser
 $ a zed                # launch an app
 $ cdf projects cortex  # cd anywhere under $HOME
 ```
@@ -50,6 +51,7 @@ Every command takes an optional query, so `o books raft` goes straight to the sh
 | `y [dir]` | the yazi file manager, and it `cd`s to wherever you quit |
 | `a [query]` | launch an installed app: `a zed`, `a cursor`, `a ghostty` |
 | `ow [query]` | open a file with an app you pick, instead of its default one |
+| `w [query]` | search the web in your default browser, or open a URL |
 | `s [text]` | live ripgrep through file contents, opens the editor at the matching line |
 | `sp [text]` | Spotlight search across file contents disk-wide, opens the hit |
 | `f [query]` | print the path, for example `cp "$(f raft)" .` |
@@ -103,10 +105,13 @@ Dependencies, all from Homebrew: `fzf` (0.48 or newer, for `fzf --zsh`), `fd`, `
 | `OPEN_RECENT_WINDOW` | `14d` | how far back `recent` looks |
 | `OPEN_HIDDEN` | unset | set to `1` to include dotfiles in global searches |
 | `OPEN_APP_DIRS` | `/Applications`, `/System/Applications`, `~/Applications` | where `a` and `ow` look for apps |
+| `OPEN_SEARCH` | `https://www.google.com/search?q=%s` | search URL for `w`; `%s` is replaced with the query |
 
 Set any of them before the `source` line in your `.zshrc`.
 
 Apps are searched separately from files on purpose: an `.app` is a directory of thousands of files, so `fd/open-ignore` skips the bundles wholesale and `a` walks the application directories two levels deep instead. That is enough for `/System/Applications/Utilities`, and not enough to descend into bundle internals. `/System/Library/CoreServices` is left out because it is mostly internal agents like `WindowManagerShowDesktopEducation.app`; add it to `OPEN_APP_DIRS` if you want `Finder.app` in the list.
+
+`w` is the browser omnibox. `w raft consensus` searches, `w rust-lang.org` opens the site, `w localhost:3000` hits the local server. A bare `w` is a picker over recent queries, same shape as a bare `o`. `open -u` hands the URL to whatever browser is the system default, which on macOS is a new tab if that browser is already running. Set `OPEN_SEARCH` if you want DuckDuckGo or Kagi instead of Google. `w -s github.com` forces a search when the heuristic would have opened the site. It shadows `/usr/bin/w` (who is logged in), which you will not miss on a laptop.
 
 The layer costs about 10ms of shell startup. `fzf --zsh` and `zoxide init zsh` each fork a process, so their output is cached under `~/.cache/zsh-completions`; delete that directory after upgrading either tool.
 
