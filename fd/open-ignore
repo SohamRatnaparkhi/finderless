@@ -1,0 +1,29 @@
+# Paths the fuzzy-open commands never search. gitignore syntax, applied by fd
+# via --ignore-file. Add a line here whenever noise shows up in `o` results.
+
+Library/
+.Trash/
+.git/
+node_modules/
+__pycache__/
+.venv/
+venv/
+.cache/
+.npm/
+.cargo/
+.rustup/
+.gradle/
+.terraform/
+.pyenv/
+.nvm/
+.docker/
+.ollama/
+.vscode/extensions/
+miniconda/
+anaconda3/
+go/pkg/
+*.app/
+*.photoslibrary/
+*.framework/
+.DS_Store
+.zcompdump*

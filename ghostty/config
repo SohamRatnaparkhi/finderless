@@ -1,0 +1,7 @@
+# Ghostty reads this file (the neighbouring config.ghostty is empty and is not a
+# path Ghostty looks at).
+
+# Make the LEFT option key send Alt/Esc so terminal Alt bindings actually fire:
+# alt-c (fzf cd) and the Opt+Backspace / Opt+arrow word motions bound in
+# ~/.zshrc. The right option key still types ø, ∑, … as before.
+macos-option-as-alt = left
