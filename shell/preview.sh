@@ -11,6 +11,25 @@ f=$1
 cols=${FZF_PREVIEW_COLUMNS:-80}
 lines=${FZF_PREVIEW_LINES:-30}
 
+# App bundles are directories, so they have to be handled before the generic
+# directory listing or you get a preview of Contents/ instead of the app.
+case "$f" in
+  *.app|*.app/)
+    plist="${f%/}/Contents/Info.plist"
+    printf '\033[1m%s\033[0m\n\n' "$(basename "${f%/}" .app)"
+    if [ -f "$plist" ]; then
+      for key in CFBundleShortVersionString CFBundleIdentifier LSMinimumSystemVersion; do
+        val=$(plutil -extract "$key" raw -o - "$plist" 2>/dev/null) \
+          && [ -n "$val" ] && printf '%-24s %s\n' "$key" "$val"
+      done
+    fi
+    printf '%-24s %s\n' path "${f%/}"
+    mdls -name kMDItemLastUsedDate -name kMDItemFSSize -- "${f%/}" 2>/dev/null \
+      | sed 's/^kMDItem/  /'
+    exit 0
+    ;;
+esac
+
 if [ -d "$f" ]; then
   eza -la --icons --color=always --group-directories-first -- "$f" 2>/dev/null \
     || ls -la -- "$f"

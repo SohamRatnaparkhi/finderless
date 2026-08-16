@@ -6,6 +6,8 @@
 
 : ${OPEN_ROOT:=$HOME}                                  # what the global commands search
 : ${OPEN_RECENT_WINDOW:=14d}                           # how far back `recent` looks
+(( $+OPEN_APP_DIRS )) ||                               # where `a` looks for apps
+  OPEN_APP_DIRS=(/Applications /System/Applications "$HOME/Applications")
 OPEN_IGNORE=${XDG_CONFIG_HOME:-$HOME/.config}/fd/open-ignore
 OPEN_PREVIEW=${XDG_CONFIG_HOME:-$HOME/.config}/shell/preview.sh
 OPEN_PREVIEW_WINDOW='right,55%,border-left,wrap,<90(up,55%,border-bottom)'
@@ -90,6 +92,19 @@ _open_recent() {
      -X stat -f '%m %N' 2>/dev/null | sort -rn | cut -d' ' -f2-
 }
 
+# Installed applications. Not reachable through the file commands on purpose:
+# an .app is a directory of thousands of files, so `open-ignore` skips the
+# bundles wholesale and they get their own producer instead. Depth 2 picks up
+# /System/Applications/Utilities without descending into bundle internals.
+# /System/Library/CoreServices is left out: it is full of internal agents like
+# WindowManagerShowDesktopEducation.app that you would never launch by hand.
+# Add it to OPEN_APP_DIRS yourself if you want Finder.app in the list.
+_open_apps() {
+  local -a dirs=(${^OPEN_APP_DIRS}(N-/))   # keep only the ones that exist
+  (( $#dirs )) || return
+  fd --type d --extension app --max-depth 2 . $dirs 2>/dev/null | sed 's:/$::'
+}
+
 _open_edit_at() {  # open $1 at line $2 in whichever editor is configured
   local file=$1 line=${2:-1}
   case ${OPEN_EDITOR:t} in
@@ -139,6 +154,18 @@ rv()  { _open_run reveal 'reveal> '    "$*" _open_files "$OPEN_ROOT" }   # revea
 f()   { _open_run print  'path> '      "$*" _open_files "$OPEN_ROOT" }   # print path(s): cp "$(f)" .
 fc()  { _open_run copy   'copy> '      "$*" _open_files "$OPEN_ROOT" }   # copy path to clipboard
 cdf() { _open_run cd     'cd> '        "$*" _open_dirs  "$OPEN_ROOT" }   # jump to any directory
+a()   { _open_run open   'app> '       "$*" _open_apps              }   # launch an installed app
+
+ow() {  # open a file with an app you pick, instead of its default one
+  local file app
+  file=$(_open_files "$OPEN_ROOT" | fzf --prompt='file> ' --query="$*" \
+           --preview="$OPEN_PREVIEW {}" --preview-window="$OPEN_PREVIEW_WINDOW") || return
+  [[ -n $file ]] || return
+  app=$(_open_apps | fzf --prompt="open ${file:t} with> " \
+           --preview="$OPEN_PREVIEW {}" --preview-window="$OPEN_PREVIEW_WINDOW") || return
+  [[ -n $app ]] || return
+  open -a "$app" -- "$file"
+}
 
 recent() {  # files touched in the last $OPEN_RECENT_WINDOW, newest first
   local -a _open_opts=(--no-sort)
@@ -201,6 +228,10 @@ oh() {
     rv   [query]   reveal in Finder
     y    [dir]     yazi file manager, cds where you left off
 
+  \e[1mapps\e[0m
+    a    [query]   launch an installed app:  a zed, a cursor, a ghostty
+    ow   [query]   open a file with an app you pick, not its default one
+
   \e[1msearch by content\e[0m
     s    [text]    live ripgrep in this tree, opens at the matching line
     sp   [text]    Spotlight: searches file contents disk-wide, opens the hit
@@ -220,6 +251,7 @@ oh() {
 
   \e[1mtuning\e[0m
     OPEN_ROOT=$OPEN_ROOT            searched by every command without a dir argument
+    OPEN_APP_DIRS=($OPEN_APP_DIRS)
     dotfiles are skipped for whole-\$HOME searches, kept for cwd ones (oc, s, ctrl-t);
     OPEN_HIDDEN=1 includes them everywhere
     edit ${OPEN_IGNORE/#$HOME/~} to hide noisy directories from results

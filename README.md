@@ -31,6 +31,8 @@ Every command takes an optional query, so `o books raft` goes straight to the sh
 | `ql [query]` | Quick Look preview, without launching an app |
 | `rv [query]` | reveal in Finder, for the rare case you need it |
 | `y [dir]` | the yazi file manager, and it `cd`s to wherever you quit |
+| `a [query]` | launch an installed app: `a zed`, `a cursor`, `a ghostty` |
+| `ow [query]` | open a file with an app you pick, instead of its default one |
 | `s [text]` | live ripgrep through file contents, opens the editor at the matching line |
 | `sp [text]` | Spotlight search across file contents disk-wide, opens the hit |
 | `f [query]` | print the path, for example `cp "$(f raft)" .` |
@@ -79,6 +81,9 @@ Dependencies, all from Homebrew: `fzf` `fd` `ripgrep` `bat` `eza` `zoxide` `yazi
 | `OPEN_EDITOR` | first of `zed`, `cursor`, `code`, `nvim`, `vim` found | editor for `oe` and `s` |
 | `OPEN_RECENT_WINDOW` | `14d` | how far back `recent` looks |
 | `OPEN_HIDDEN` | unset | set to `1` to include dotfiles in global searches |
+| `OPEN_APP_DIRS` | `/Applications`, `/System/Applications`, `~/Applications` | where `a` and `ow` look for apps |
+
+Apps are searched separately from files on purpose: an `.app` is a directory of thousands of files, so `fd/open-ignore` skips the bundles wholesale and `a` walks the application directories two levels deep instead (enough for `/System/Applications/Utilities`, not enough to descend into bundle internals). `/System/Library/CoreServices` is left out because it is mostly internal agents like `WindowManagerShowDesktopEducation.app`; add it to `OPEN_APP_DIRS` if you want `Finder.app` in the list.
 
 Set any of them before the `source` line in your `.zshrc`.
 
