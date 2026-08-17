@@ -6,8 +6,10 @@
 
 : ${OPEN_ROOT:=$HOME}                                  # what the global commands search
 : ${OPEN_RECENT_WINDOW:=14d}                           # how far back `recent` looks
+: ${OPEN_SEARCH:='https://www.google.com/search?q=%s'} # `w` search URL; %s is the query
 (( $+OPEN_APP_DIRS )) ||                               # where `a` looks for apps
   OPEN_APP_DIRS=(/Applications /System/Applications "$HOME/Applications")
+: ${OPEN_WEB_HISTORY:=${XDG_DATA_HOME:-$HOME/.local/share}/finderless/web-history}
 OPEN_IGNORE=${XDG_CONFIG_HOME:-$HOME/.config}/fd/open-ignore
 OPEN_PREVIEW=${XDG_CONFIG_HOME:-$HOME/.config}/shell/preview.sh
 OPEN_PREVIEW_WINDOW='right,55%,border-left,wrap,<90(up,55%,border-bottom)'
@@ -105,6 +107,89 @@ _open_apps() {
   fd --type d --extension app --max-depth 2 . $dirs 2>/dev/null | sed 's:/$::'
 }
 
+# Percent-encode a query string for a URL. Spaces become +, everything else
+# that is not unreserved is %HH. Bytewise so UTF-8 (café, 日本語) stays valid.
+_open_web_encode() {
+  emulate -L zsh -o no_multibyte
+  local str=$1 out="" i c hex
+  for (( i = 1; i <= ${#str}; i++ )); do
+    c=$str[i]
+    case $c in
+      [a-zA-Z0-9.~_-]) out+=$c ;;
+      ' ')             out+='+' ;;
+      *)               printf -v hex '%02X' "'$c"; out+="%$hex" ;;
+    esac
+  done
+  print -rn -- "$out"
+}
+
+# True when $1 should be opened as a URL rather than sent to a search engine.
+# Spaces are always a search. Schemes, localhost, IPs, www., and host/path
+# or host:port are URLs. A bare host.tld is a URL unless the last label is a
+# common file extension (README.md, notes.pdf), which is almost certainly a
+# search. `w -s github.com` forces a search when the heuristic is wrong.
+_open_web_is_url() {
+  setopt localoptions extendedglob
+  local q=$1
+  [[ -n $q ]] || return 1
+  [[ $q == *[[:space:]]* ]] && return 1
+  [[ $q == [a-zA-Z][a-zA-Z0-9+.-]#://* ]] && return 0
+  [[ $q == localhost || $q == localhost:* || $q == localhost/* ]] && return 0
+  [[ $q =~ '^([0-9]{1,3}\.){3}[0-9]{1,3}([:/].*)?$' ]] && return 0
+  [[ $q == www.* ]] && return 0
+  [[ $q == *.*/* || $q == *.*:* ]] && return 0
+  local host=${q:l} ext
+  [[ $host == *.* && $host != .* && $host != *. ]] || return 1
+  ext=${host:e}
+  case $ext in
+    pdf|md|txt|zsh|sh|bash|py|js|ts|tsx|jsx|rs|go|json|yml|yaml|toml|\
+    css|scss|html|htm|xml|csv|log|lock|map|c|h|cc|hh|cpp|hpp|java|kt|\
+    swift|rb|php|lua|vim|sql|wasm|so|dylib|o|a|out|bin|exe|dmg|pkg|\
+    zip|tar|gz|tgz|bz2|xz|7z|rar|jpg|jpeg|png|gif|webp|svg|ico|bmp|\
+    tiff|mp3|mp4|mov|wav|flac|aac|mkv|avi|webm|doc|docx|ppt|pptx|\
+    xls|xlsx|pages|key|numbers|epub|mobi|azw3|plist|conf|cfg|ini|env)
+      return 1 ;;
+  esac
+  [[ $ext == [a-z][a-z]# ]] && (( ${#ext} >= 2 ))
+}
+
+# Add a scheme when the user typed a bare host. Local addresses stay http.
+_open_web_normalize_url() {
+  setopt localoptions extendedglob
+  local q=$1
+  if [[ $q == [a-zA-Z][a-zA-Z0-9+.-]#://* ]]; then
+    print -r -- "$q"
+  elif [[ $q == localhost || $q == localhost[:/]* ||
+          $q =~ '^([0-9]{1,3}\.){3}[0-9]{1,3}([:/].*)?$' ]]; then
+    print -r -- "http://$q"
+  else
+    print -r -- "https://$q"
+  fi
+}
+
+# Print the URL `w` would open for $1. $2=1 forces a search even if it
+# looks like a URL.
+_open_web_dest() {
+  local q=$1 force=${2:-0}
+  [[ -n $q ]] || return 1
+  if (( !force )) && _open_web_is_url "$q"; then
+    _open_web_normalize_url "$q"
+  else
+    print -r -- "${OPEN_SEARCH//\%s/$(_open_web_encode "$q")}"
+  fi
+}
+
+_open_web_remember() {
+  local q=$1 file=$OPEN_WEB_HISTORY tmp
+  [[ -n $q ]] || return
+  mkdir -p -- "${file:h}"
+  tmp=$(mktemp "${file:h}/.web-history.XXXXXX") || return
+  {
+    print -r -- "$q"
+    [[ -f $file ]] && grep -Fxv -- "$q" "$file"
+  } | head -n 200 > "$tmp" && mv -f -- "$tmp" "$file"
+}
+
 _open_edit_at() {  # open $1 at line $2 in whichever editor is configured
   local file=$1 line=${2:-1}
   case ${OPEN_EDITOR:t} in
@@ -165,6 +250,46 @@ ow() {  # open a file with an app you pick, instead of its default one
            --preview="$OPEN_PREVIEW {}" --preview-window="$OPEN_PREVIEW_WINDOW") || return
   [[ -n $app ]] || return
   open -a "$app" -- "$file"
+}
+
+# Web search in the default browser. A query that looks like a URL is opened
+# directly (github.com, localhost:3000, https://...); anything else goes to
+# $OPEN_SEARCH. Bare `w` is a picker over recent queries, same shape as `o`.
+# `w -s github.com` forces a search when the URL heuristic is wrong.
+w() {
+  local force_search=0
+  if [[ ${1-} == -s || ${1-} == --search ]]; then
+    force_search=1
+    shift
+  fi
+
+  local -a queries
+  if (( $# )); then
+    queries=("$*")
+  else
+    local -a lines
+    lines=("${(@f)$(
+      { [[ -f $OPEN_WEB_HISTORY ]] && cat -- "$OPEN_WEB_HISTORY" } |
+        fzf --multi --print-query --prompt='web> ' \
+            --bind='enter:accept-or-print-query' \
+            --preview='printf "open in default browser\n\n%s\n" {}' \
+            --preview-window='down,4,wrap,border-top'
+    )}") || return
+    if (( $#lines >= 2 )); then
+      queries=("${lines[2,-1]}")
+    elif [[ -n ${lines[1]-} ]]; then
+      queries=("${lines[1]}")
+    else
+      return 1
+    fi
+  fi
+
+  local q dest
+  for q in "$queries[@]"; do
+    dest=$(_open_web_dest "$q" $force_search) || continue
+    _open_web_remember "$q"
+    open -u "$dest"
+  done
 }
 
 recent() {  # files touched in the last $OPEN_RECENT_WINDOW, newest first
@@ -232,6 +357,10 @@ oh() {
     a    [query]   launch an installed app:  a zed, a cursor, a ghostty
     ow   [query]   open a file with an app you pick, not its default one
 
+  \e[1mweb\e[0m
+    w    [query]   search the web in your default browser, or open a URL
+                   bare w picks from recent queries; w -s forces a search
+
   \e[1msearch by content\e[0m
     s    [text]    live ripgrep in this tree, opens at the matching line
     sp   [text]    Spotlight: searches file contents disk-wide, opens the hit
@@ -251,6 +380,7 @@ oh() {
 
   \e[1mtuning\e[0m
     OPEN_ROOT=$OPEN_ROOT            searched by every command without a dir argument
+    OPEN_SEARCH=$OPEN_SEARCH
     OPEN_APP_DIRS=($OPEN_APP_DIRS)
     dotfiles are skipped for whole-\$HOME searches, kept for cwd ones (oc, s, ctrl-t);
     OPEN_HIDDEN=1 includes them everywhere
