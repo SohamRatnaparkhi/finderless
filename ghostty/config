@@ -5,3 +5,15 @@
 # alt-c (fzf cd) and the Opt+Backspace / Opt+arrow word motions bound in
 # ~/.zshrc. The right option key still types ø, ∑, … as before.
 macos-option-as-alt = left
+
+# tmux is configured with extended-keys on. Ghostty's default cmd+c / cmd+v
+# are performable, so tmux claims the key and Ghostty sends a CSI-u sequence
+# instead of actually copying/pasting. That sequence lands in zsh and can
+# fire finderless (ctrl-o). Force real clipboard actions.
+keybind = super+c=copy_to_clipboard:mixed
+keybind = super+v=paste_from_clipboard
+keybind = super+shift+v=paste_from_selection
+
+# cmd+o is unbound in Ghostty, so it falls through as a key event. Do not
+# let it reach the finderless ctrl-o widget.
+keybind = super+o=ignore
