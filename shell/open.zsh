@@ -26,9 +26,10 @@ if [[ -z ${OPEN_EDITOR-} ]]; then
   : ${OPEN_EDITOR:=${VISUAL:-${EDITOR:-}}}
 fi
 
+# No --tmux here. Ghostty + tmux extended-keys already fight over cmd+v;
+# an inherited --tmux=center popup also steals every other fzf (agmux, w).
 export FZF_DEFAULT_OPTS="
   --height=80% --layout=reverse --border=rounded --info=inline-right --cycle
-  --tmux=center,90%,80%
   --scheme=path --tiebreak=begin,length
   --prompt='» ' --pointer='▸' --marker='✓'
   --bind='ctrl-/:toggle-preview'

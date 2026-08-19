@@ -117,21 +117,37 @@ fi
 # widget) and any Opt+Backspace / Opt+arrow zsh bindings dead.
 if [ "$DO_GHOSTTY" -eq 1 ] && [ -d "/Applications/Ghostty.app" ]; then
   GHOSTTY_CONF="$CONFIG_DIR/ghostty/config"
-  if [ -f "$GHOSTTY_CONF" ] && grep -q '^[[:space:]]*macos-option-as-alt' "$GHOSTTY_CONF"; then
-    say "ok       ghostty already sets macos-option-as-alt"
-  elif [ -f "$GHOSTTY_CONF" ]; then
-    cp "$GHOSTTY_CONF" "$GHOSTTY_CONF.bak.$STAMP"
-    {
-      echo
-      echo "# Added by finderless: make the left option key send Alt/Esc so alt-c and"
-      echo "# Opt+Backspace word motions fire. The right option key still types ø, ∑, …"
-      echo "macos-option-as-alt = left"
-    } >> "$GHOSTTY_CONF"
-    say "appended ghostty macos-option-as-alt = left"
-  else
-    mkdir -p "$(dirname "$GHOSTTY_CONF")"
+  mkdir -p "$(dirname "$GHOSTTY_CONF")"
+  if [ ! -f "$GHOSTTY_CONF" ]; then
     cp "$REPO_DIR/ghostty/config" "$GHOSTTY_CONF"
     say "wrote    ${GHOSTTY_CONF/#$HOME/\~}"
+  else
+    # Append only the lines that are missing so a re-run after git pull
+    # picks up the cmd+v pin without clobbering the rest of the file.
+    added=0
+    while IFS= read -r line; do
+      case "$line" in
+        ''|\#*) continue ;;
+      esac
+      key="${line%%=*}"
+      key="$(printf '%s' "$key" | sed 's/[[:space:]]*$//')"
+      if grep -q "^[[:space:]]*${key}[[:space:]]*=" "$GHOSTTY_CONF"; then
+        continue
+      fi
+      if [ "$added" -eq 0 ]; then
+        {
+          echo
+          echo "# Added by finderless"
+        } >> "$GHOSTTY_CONF"
+      fi
+      printf '%s\n' "$line" >> "$GHOSTTY_CONF"
+      added=$((added + 1))
+    done < "$REPO_DIR/ghostty/config"
+    if [ "$added" -eq 0 ]; then
+      say "ok       ghostty config already has the finderless keys"
+    else
+      say "appended $added ghostty line(s)"
+    fi
   fi
   warn "reload Ghostty (cmd+shift+,) or restart it for that to take effect"
 fi
