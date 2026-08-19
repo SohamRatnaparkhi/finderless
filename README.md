@@ -65,7 +65,7 @@ Every command takes an optional query, so `o books raft` goes straight to the sh
 
 | Key | Action |
 | --- | --- |
-| `ctrl-o` | pick a file and open it, leaving the line you were typing intact |
+| `alt-o` | pick a file and open it, leaving the line you were typing intact |
 | `ctrl-t` | insert a path at the cursor |
 | `ctrl-r` | fuzzy shell history |
 | `alt-c` | `cd` into a directory |
@@ -82,7 +82,7 @@ Previews are type-aware, because a file picker that cannot show you the file is 
 
 **Whole-`$HOME` searches skip dotfiles.** On a working developer machine, the agent and editor state under `~` dwarfs everything you actually want to open. On the machine this was built for, `.go`, `.cursor`, `.devin` and `.windsurf` accounted for 310k of 349k files: the real documents were the remaining 11%. Excluding them takes a full scan from 1.27s to 0.25s and, more importantly, stops `od` from surfacing model checkpoints instead of books. Anything scoped to a directory you are standing in (`oc`, `s`, `ctrl-t`) still sees hidden files, so project dotfiles stay reachable. Set `OPEN_HIDDEN=1` to include them everywhere, and add your own noise to `fd/open-ignore`.
 
-**Ghostty needs `macos-option-as-alt`, and cmd+v must stay a real paste.** Ghostty does not send Option as Alt by default, which silently kills `alt-c` and any `Opt+Backspace` word-motion bindings you have in zsh. The installer sets `macos-option-as-alt = left`, which leaves the right Option key free to type `ø`, `∑` and friends. It also pins `cmd+c` / `cmd+v` to copy and paste. tmux `extended-keys` makes Ghostty's default performable paste hand the key to the shell instead, and that CSI-u sequence can fire the finderless `ctrl-o` widget. Skip the Ghostty edits with `--no-ghostty`. Note that Ghostty reads `~/.config/ghostty/config`, with no file extension: a `config.ghostty` sitting next to it is ignored.
+**Ghostty needs `macos-option-as-alt`, and every paste must stay a paste.** Ghostty does not send Option as Alt by default, which silently kills `alt-c` and any `Opt+Backspace` word-motion bindings you have in zsh. The installer sets `macos-option-as-alt = left`, which leaves the right Option key free to type `ø`, `∑` and friends. It also pins every paste action (`cmd+v`, `cmd+shift+v`, the Edit menu) to a real clipboard paste. tmux `extended-keys` makes Ghostty's default performable paste hand the key to the shell instead, and that sequence used to fire the file picker. The picker is now `alt-o` (left option + o), not `ctrl-o`. Skip the Ghostty edits with `--no-ghostty`. Note that Ghostty reads `~/.config/ghostty/config`, with no file extension: a `config.ghostty` sitting next to it is ignored.
 
 ## What is in the box
 

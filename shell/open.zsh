@@ -335,11 +335,20 @@ y() {  # yazi file manager; cd to wherever you left off on quit
 
 # ------------------------------------------------------------------ keys
 
-# Ctrl-O from any prompt: pick a file and open it, leaving the typed line intact.
-# (Ctrl-T, from fzf, already covers inserting a path at the cursor.)
+# Opt/Alt-O from any prompt: pick a file and open it, leaving the typed line
+# intact. Used to be ctrl-o. That key is also how a mangled bracketed-paste
+# or a Ghostty/tmux CSI-u "paste" arrives in zsh, so every paste opened the
+# picker. Ctrl-T still inserts a path. Left option is Alt (Ghostty config).
 _open_widget() { zle -I; o; zle reset-prompt }
 zle -N _open_widget
-bindkey '^O' _open_widget
+bindkey -r '^O' 2>/dev/null
+bindkey '\eo' _open_widget
+bindkey -M viins '\eo' _open_widget
+
+# If a paste is wrapped in the bracketed-paste markers, insert it as text
+# even when tmux/Ghostty have been fighting over the key. Never run `o`.
+_open_bracketed_paste() { zle .bracketed-paste }
+zle -N bracketed-paste _open_bracketed_paste
 
 # ------------------------------------------------------------------ help
 
@@ -374,7 +383,7 @@ oh() {
     recent [dir]   files touched in the last $OPEN_RECENT_WINDOW, newest first
 
   \e[1mkeys\e[0m
-    ctrl-o   pick a file and open it            ctrl-t   insert a path into the line
+    alt-o    pick a file and open it            ctrl-t   insert a path into the line
     ctrl-r   fuzzy shell history                alt-c    cd into a directory
     tab      multi-select (open several)        ctrl-/   toggle the preview pane
     ctrl-u/d scroll the preview                 ctrl-a   select all matches
